@@ -122,7 +122,7 @@
       <button onclick="switchTab('scan')" id="dtab-scan" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-blue-700">📷 Scan & Pengeluaran</button>
       <button onclick="switchTab('stock')" id="dtab-stock" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📦 Daftar Stok</button>
       <button onclick="switchTab('print')" id="dtab-print" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">🖨️ Cetak Label A4</button>
-      <button onclick="switchTab('logs')" id="dtab-logs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📋 Riwayat & Cetak Ulang BPB</button>
+      <button onclick="switchTab('logs')" id="dtab-logs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📋 Riwayat & Audit BPB</button>
     </nav>
   </header>
 
@@ -243,7 +243,6 @@
             </div>
           </div>
 
-          <!-- TOMBOL AKSI MODE KELUAR -->
           <div id="actionOutBtns" class="grid grid-cols-1 md:grid-cols-2 gap-2">
             <button onclick="addToCart()"
               class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl transition shadow">
@@ -255,7 +254,6 @@
             </button>
           </div>
 
-          <!-- TOMBOL AKSI MODE MASUK -->
           <div id="actionInBtns" class="hidden">
             <button id="btnSubmitIn" onclick="submitStockIn()"
               class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow">
@@ -361,7 +359,6 @@
           <button onclick="resetLogFilter()" class="text-xs text-slate-500 hover:text-blue-600 font-semibold">Reset Filter</button>
         </div>
 
-        <!-- PANEL FILTER TANGGAL & ITEM -->
         <div class="grid grid-cols-1 md:grid-cols-12 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
           <div class="md:col-span-4">
             <label class="text-xs font-semibold text-slate-600">Cari Barang / Katalog / Penerima / BPB</label>
@@ -395,7 +392,6 @@
           </div>
         </div>
 
-        <!-- RINGKASAN AUDIT -->
         <div id="logSummary" class="hidden flex flex-wrap gap-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-900">
           <span>Ditemukan: <strong id="sumCount">0</strong> transaksi</span>
           <span>Total Jumlah Barang: <strong id="sumQty">0</strong> unit</span>
@@ -414,7 +410,7 @@
     <button onclick="switchTab('scan')" id="mtab-scan" class="py-2.5 text-xs font-semibold text-blue-600">📷<span class="block mt-0.5">Scan</span></button>
     <button onclick="switchTab('stock')" id="mtab-stock" class="py-2.5 text-xs font-semibold text-slate-500">📦<span class="block mt-0.5">Stok</span></button>
     <button onclick="switchTab('print')" id="mtab-print" class="py-2.5 text-xs font-semibold text-slate-500">🖨️<span class="block mt-0.5">Label</span></button>
-    <button onclick="switchTab('logs')" id="mtab-logs" class="py-2.5 text-xs font-semibold text-slate-500">📋<span class="block mt-0.5">BPB/Log</span></button>
+    <button onclick="switchTab('logs')" id="mtab-logs" class="py-2.5 text-xs font-semibold text-slate-500">📋<span class="block mt-0.5">Audit/BPB</span></button>
   </nav>
 
   <script>
@@ -426,7 +422,7 @@
     let inventory = [];
     let selectedItem = null;
     let mutasiMode = 'OUT';
-    let cart = []; // Keranjang pengeluaran barang
+    let cart = [];
     let selectedPrintRows = new Set();
     let html5QrCode = null;
     let isCameraRunning = false;
@@ -772,7 +768,6 @@
       }
     }
 
-    // Pengeluaran cepat tanpa cetak BPB
     async function quickOutNoPrint() {
       if (!selectedItem) return;
       const qty = Number(document.getElementById('mutasiQty').value);
@@ -798,7 +793,6 @@
       }
     }
 
-    // Penambahan stok (Masuk)
     async function submitStockIn() {
       if (!selectedItem) return;
       const qty = Number(document.getElementById('mutasiQty').value);
@@ -1008,7 +1002,7 @@
       setTimeout(() => window.print(), 300);
     }
 
-    // ===== RIWAYAT MUTASI =====
+    // ===== RIWAYAT MUTASI & AUDIT =====
     function resetLogFilter() {
       document.getElementById('logSearch').value = '';
       document.getElementById('logJenis').value = 'OUT';
@@ -1076,3 +1070,12 @@
         el.innerHTML = '<p class="text-rose-500 text-center py-4">Gagal memuat riwayat: ' + escapeHtml(err.message) + '</p>';
       }
     }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+  </script>
+</body>
+</html>
