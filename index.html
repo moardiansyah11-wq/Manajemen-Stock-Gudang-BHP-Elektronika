@@ -9,11 +9,18 @@
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <style>
     @media print {
-      @page { size: A4 portrait; margin: 8mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       body * { visibility: hidden; }
       #printArea, #printArea * { visibility: visible; }
       #printArea {
-        position: absolute; left: 0; top: 0; width: 100%;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+
+      /* MODE 1: CETAK LABEL BARCODE A4 */
+      #printArea.mode-label {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr);
         gap: 4mm;
@@ -37,6 +44,40 @@
       }
       .label-loc { font-size: 7pt; color: #334155; }
       .label-svg { max-width: 100%; height: 18mm; }
+
+      /* MODE 2: CETAK BUKTI PENGELUARAN BARANG (BPB) */
+      #printArea.mode-bpb {
+        display: block !important;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #000;
+        font-size: 10.5pt;
+      }
+      .bpb-box {
+        border: 1.5px solid #000;
+        padding: 16px 20px;
+      }
+      .bpb-header {
+        text-align: center;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+        margin-bottom: 12px;
+      }
+      .bpb-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        margin-bottom: 18px;
+      }
+      .bpb-table th, .bpb-table td {
+        border: 1px solid #000;
+        padding: 6px 8px;
+        font-size: 10pt;
+      }
+      .bpb-table th {
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   </style>
 </head>
@@ -78,10 +119,10 @@
       </div>
     </div>
     <nav class="hidden md:flex max-w-5xl mx-auto px-4 gap-2 pb-2">
-      <button onclick="switchTab('scan')" id="dtab-scan" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-blue-700">📷 Scan Barcode</button>
+      <button onclick="switchTab('scan')" id="dtab-scan" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-blue-700">📷 Scan & Pengeluaran</button>
       <button onclick="switchTab('stock')" id="dtab-stock" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📦 Daftar Stok</button>
       <button onclick="switchTab('print')" id="dtab-print" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">🖨️ Cetak Label A4</button>
-      <button onclick="switchTab('logs')" id="dtab-logs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📋 Riwayat Mutasi</button>
+      <button onclick="switchTab('logs')" id="dtab-logs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📋 Riwayat & Cetak Ulang BPB</button>
     </nav>
   </header>
 
@@ -90,7 +131,7 @@
       Menghubungkan ke Google Sheets...
     </div>
 
-    <!-- TAB 1: SCAN BARCODE -->
+    <!-- TAB 1: SCAN BARCODE & PENGELUARAN -->
     <section id="tab-scan" class="space-y-4">
       <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
         <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -121,11 +162,42 @@
         </div>
       </div>
 
+      <!-- KERANJANG PENGELUARAN (MULTI-ITEM) -->
+      <div id="cartBox" class="hidden bg-white rounded-2xl shadow-sm p-4 border-2 border-rose-500 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="font-bold text-rose-700">🛒 Daftar Pengeluaran Barang (<span id="cartCount">0</span> item)</h3>
+          <button onclick="clearCart()" class="text-xs text-slate-500 hover:text-rose-600">Kosongkan</button>
+        </div>
+        <div id="cartItemsList" class="divide-y divide-slate-100 text-sm"></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Nama Penerima *</label>
+            <input id="bpbPenerima" type="text" placeholder="Nama Mahasiswa / Dosen / Teknisi"
+              class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm mt-1" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Keperluan *</label>
+            <input id="bpbKeperluan" type="text" placeholder="Praktikum / Tugas Akhir / Perbaikan"
+              class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm mt-1" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Petugas Gudang</label>
+            <input id="bpbPetugas" type="text" value="Muhammad Ardiansyah, S.Tr.T."
+              class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm mt-1" />
+          </div>
+        </div>
+        <button id="btnProcessCart" onclick="processCartAndPrint()"
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl shadow transition">
+          🖨️ Proses Pengeluaran & Cetak Bukti (BPB)
+        </button>
+      </div>
+
       <div id="duplicateBox" class="hidden bg-amber-50 border border-amber-300 rounded-2xl p-4">
         <p class="text-sm font-bold text-amber-800 mb-2">Ditemukan beberapa barang dengan No. Katalog sama. Pilih barang:</p>
         <div id="duplicateList" class="space-y-2"></div>
       </div>
 
+      <!-- KARTU DETAIL BARANG -->
       <div id="itemActionCard" class="hidden bg-white rounded-2xl shadow-sm p-5 border-2 border-blue-500 space-y-4">
         <div class="flex justify-between items-start gap-2">
           <div>
@@ -150,11 +222,11 @@
           <div class="grid grid-cols-2 gap-2">
             <button id="btnModeOut" onclick="setMutasiMode('OUT')"
               class="py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 bg-rose-500 text-white">
-              − Kurangi Stok
+              − Keluar (Pengeluaran)
             </button>
             <button id="btnModeIn" onclick="setMutasiMode('IN')"
               class="py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 text-emerald-600 bg-white">
-              + Tambah Stok
+              + Tambah Stok (Masuk)
             </button>
           </div>
 
@@ -164,17 +236,32 @@
               <input id="mutasiQty" type="number" min="1" value="1"
                 class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold mt-1 focus:border-blue-500 focus:outline-none" />
             </div>
-            <div class="md:col-span-2">
-              <label class="text-xs font-semibold text-slate-600">Keterangan / Nama Pengambil</label>
-              <input id="mutasiKet" type="text" placeholder="Contoh: Praktikum Elektronika / Pengadaan"
+            <div id="wrapKetIn" class="md:col-span-2 hidden">
+              <label class="text-xs font-semibold text-slate-600">Keterangan Penambahan</label>
+              <input id="mutasiKet" type="text" placeholder="Contoh: Pengadaan Semester II / Retur"
                 class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm mt-1 focus:border-blue-500 focus:outline-none" />
             </div>
           </div>
 
-          <button id="btnSubmitMutasi" onclick="submitMutasi()"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow">
-            Simpan Perubahan Stok
-          </button>
+          <!-- TOMBOL AKSI MODE KELUAR -->
+          <div id="actionOutBtns" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <button onclick="addToCart()"
+              class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 rounded-xl transition shadow">
+              + Masukkan ke Daftar Pengeluaran (BPB)
+            </button>
+            <button onclick="quickOutNoPrint()"
+              class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-3 rounded-xl transition text-sm">
+              Kurangi Stok Tanpa Cetak BPB
+            </button>
+          </div>
+
+          <!-- TOMBOL AKSI MODE MASUK -->
+          <div id="actionInBtns" class="hidden">
+            <button id="btnSubmitIn" onclick="submitStockIn()"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow">
+              + Simpan Penambahan Stok
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -237,9 +324,9 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h2 class="font-bold text-slate-800">Cetak Label Barcode (Kertas A4)</h2>
-            <p class="text-xs text-slate-500">Format Code 128 (16 digit) • 24 label per halaman A4 (3 kolom × 8 baris)</p>
+            <p class="text-xs text-slate-500">Format Code 128 (16 digit) • 24 label per halaman A4</p>
           </div>
-          <button onclick="executePrint()"
+          <button onclick="executePrintLabels()"
             class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow">
             🖨️ Cetak Label Terpilih (<span id="selectedCount">0</span>)
           </button>
@@ -266,11 +353,11 @@
       </div>
     </section>
 
-    <!-- TAB 4: RIWAYAT MUTASI -->
+    <!-- TAB 4: RIWAYAT MUTASI & CETAK ULANG BPB -->
     <section id="tab-logs" class="hidden space-y-4">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
         <div class="flex justify-between items-center mb-3">
-          <h2 class="font-bold text-slate-800">30 Riwayat Mutasi Terakhir</h2>
+          <h2 class="font-bold text-slate-800">Riwayat Mutasi & Cetak Ulang BPB</h2>
           <button onclick="loadLogs()" class="text-xs text-blue-600 font-semibold">↻ Muat Ulang</button>
         </div>
         <div id="logsContainer" class="space-y-2 text-sm"></div>
@@ -278,6 +365,7 @@
     </section>
   </main>
 
+  <!-- AREA CETAK UNIVERSAL (LABEL ATAU BPB) -->
   <div id="printArea" class="hidden"></div>
 
   <!-- NAVIGASI BAWAH (MOBILE) -->
@@ -285,23 +373,23 @@
     <button onclick="switchTab('scan')" id="mtab-scan" class="py-2.5 text-xs font-semibold text-blue-600">📷<span class="block mt-0.5">Scan</span></button>
     <button onclick="switchTab('stock')" id="mtab-stock" class="py-2.5 text-xs font-semibold text-slate-500">📦<span class="block mt-0.5">Stok</span></button>
     <button onclick="switchTab('print')" id="mtab-print" class="py-2.5 text-xs font-semibold text-slate-500">🖨️<span class="block mt-0.5">Label</span></button>
-    <button onclick="switchTab('logs')" id="mtab-logs" class="py-2.5 text-xs font-semibold text-slate-500">📋<span class="block mt-0.5">Log</span></button>
+    <button onclick="switchTab('logs')" id="mtab-logs" class="py-2.5 text-xs font-semibold text-slate-500">📋<span class="block mt-0.5">BPB/Log</span></button>
   </nav>
 
   <script>
     // ================= TEMPEL URL WEB APP APPS SCRIPT DI SINI =================
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxthUDGqrSx40KtnEihlA1TcJU8oRRUTDhQdv_0KwjykN55-N6ML-6rHI8M1j5Rtscs/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbz2DOlsUOrweaDUMiJWLr8WDgiY9v9XZ7rqIsS06d76s1fshiVQruvGV6iLMwRQipY/exec';
     // ==========================================================================
 
     let currentPin = '';
     let inventory = [];
     let selectedItem = null;
     let mutasiMode = 'OUT';
+    let cart = []; // Keranjang pengeluaran barang
     let selectedPrintRows = new Set();
     let html5QrCode = null;
     let isCameraRunning = false;
 
-    // Helper panggil API Apps Script (tanpa CORS preflight)
     async function callApi(action, params = {}) {
       if (!API_URL || API_URL.includes('PASTE_URL')) {
         throw new Error('URL API Apps Script belum diisi di file index.html.');
@@ -312,13 +400,10 @@
         body: JSON.stringify({ action, ...params })
       });
       const result = await response.json();
-      if (result.status === 'error') {
-        throw new Error(result.message || 'Terjadi kesalahan di server.');
-      }
+      if (result.status === 'error') throw new Error(result.message || 'Terjadi kesalahan.');
       return result.data;
     }
 
-    // Bunyi beep saat barcode berhasil terbaca
     function playBeep() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -422,20 +507,18 @@
       btn.className = 'bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-2 rounded-lg';
 
       html5QrCode = new Html5Qrcode('reader');
-      const config = {
-        fps: 12,
-        qrbox: { width: 280, height: 120 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ]
-      };
-
       html5QrCode.start(
         { facingMode: 'environment' },
-        config,
+        {
+          fps: 12,
+          qrbox: { width: 280, height: 120 },
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.QR_CODE
+          ]
+        },
         (decodedText) => {
           playBeep();
           document.getElementById('manualCode').value = decodedText;
@@ -446,7 +529,7 @@
       ).then(() => {
         isCameraRunning = true;
       }).catch(err => {
-        alert('Kamera tidak dapat diakses. Pastikan izin kamera diizinkan.\nDetail: ' + err);
+        alert('Kamera tidak dapat diakses.\nDetail: ' + err);
         stopCamera();
       });
     }
@@ -474,12 +557,12 @@
           event.target.value = '';
         })
         .catch(() => {
-          alert('Barcode tidak terbaca dari foto. Pastikan foto fokus, terang, dan tidak miring.');
+          alert('Barcode tidak terbaca dari foto. Pastikan foto fokus dan terang.');
           event.target.value = '';
         });
     }
 
-    // ===== PENCARIAN & UPDATE STOK =====
+    // ===== PENCARIAN BARANG =====
     function searchByCode() {
       const raw = document.getElementById('manualCode').value.trim();
       if (!raw) return;
@@ -490,10 +573,7 @@
       document.getElementById('duplicateBox').classList.add('hidden');
       document.getElementById('itemActionCard').classList.add('hidden');
 
-      if (matches.length === 0) {
-        alert('Kode "' + raw + '" tidak ditemukan di database.');
-        return;
-      }
+      if (matches.length === 0) return alert('Kode "' + raw + '" tidak ditemukan.');
 
       if (matches.length === 1) {
         showItemAction(matches[0]);
@@ -543,41 +623,249 @@
       if (mode === 'OUT') {
         btnOut.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 bg-rose-500 text-white';
         btnIn.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 text-emerald-600 bg-white';
+        document.getElementById('actionOutBtns').classList.remove('hidden');
+        document.getElementById('actionInBtns').classList.add('hidden');
+        document.getElementById('wrapKetIn').classList.add('hidden');
       } else {
         btnIn.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 bg-emerald-500 text-white';
         btnOut.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 text-rose-600 bg-white';
+        document.getElementById('actionOutBtns').classList.add('hidden');
+        document.getElementById('actionInBtns').classList.remove('hidden');
+        document.getElementById('wrapKetIn').classList.remove('hidden');
       }
     }
 
-    async function submitMutasi() {
+    // ===== KERANJANG PENGELUARAN (BPB) =====
+    function addToCart() {
       if (!selectedItem) return;
       const qty = Number(document.getElementById('mutasiQty').value);
-      const keterangan = document.getElementById('mutasiKet').value.trim();
       if (!qty || qty <= 0) return alert('Masukkan jumlah yang valid.');
 
-      const btn = document.getElementById('btnSubmitMutasi');
+      const existing = cart.find(c => c.rowNumber === selectedItem.rowNumber);
+      const totalRequested = (existing ? existing.qty : 0) + qty;
+      if (totalRequested > selectedItem.saldo) {
+        return alert('Jumlah melebihi saldo tersedia (' + selectedItem.saldo + ').');
+      }
+
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        cart.push({
+          rowNumber: selectedItem.rowNumber,
+          noKatalog: selectedItem.noKatalog,
+          nama: selectedItem.nama,
+          satuan: selectedItem.satuan,
+          lokasi: selectedItem.lokasi,
+          qty: qty
+        });
+      }
+      renderCart();
+      document.getElementById('manualCode').value = '';
+      document.getElementById('itemActionCard').classList.add('hidden');
+    }
+
+    function renderCart() {
+      const box = document.getElementById('cartBox');
+      if (cart.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+      box.classList.remove('hidden');
+      document.getElementById('cartCount').textContent = cart.length;
+      document.getElementById('cartItemsList').innerHTML = cart.map((c, idx) => `
+        <div class="py-2 flex justify-between items-center gap-2">
+          <div>
+            <p class="font-semibold text-slate-800">${escapeHtml(c.nama)}</p>
+            <p class="text-xs text-slate-500 font-mono">${c.noKatalog} • Rak: ${escapeHtml(c.lokasi)}</p>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <span class="font-bold text-rose-600">${c.qty} ${escapeHtml(c.satuan)}</span>
+            <button onclick="removeCartItem(${idx})" class="text-xs bg-slate-100 hover:bg-rose-100 text-rose-600 px-2 py-1 rounded">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function removeCartItem(idx) {
+      cart.splice(idx, 1);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    async function processCartAndPrint() {
+      if (cart.length === 0) return;
+      const penerima = document.getElementById('bpbPenerima').value.trim();
+      const keperluan = document.getElementById('bpbKeperluan').value.trim();
+      const petugas = document.getElementById('bpbPetugas').value.trim();
+
+      if (!penerima) return alert('Isi Nama Penerima terlebih dahulu.');
+      if (!keperluan) return alert('Isi Keperluan terlebih dahulu.');
+
+      const btn = document.getElementById('btnProcessCart');
       btn.disabled = true;
-      btn.textContent = 'Menyimpan ke Google Sheets...';
+      btn.textContent = 'Memproses & membuat Bukti Pengeluaran...';
+
+      try {
+        const bpbData = await callApi('processBatchOut', {
+          pin: currentPin,
+          items: cart.map(c => ({ rowNumber: c.rowNumber, qty: c.qty })),
+          penerima,
+          keperluan,
+          petugas
+        });
+
+        clearCart();
+        document.getElementById('bpbPenerima').value = '';
+        document.getElementById('bpbKeperluan').value = '';
+        await loadData();
+        renderAndPrintBPB(bpbData);
+      } catch (err) {
+        alert('Gagal memproses pengeluaran: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🖨️ Proses Pengeluaran & Cetak Bukti (BPB)';
+      }
+    }
+
+    // Pengeluaran cepat tanpa cetak BPB
+    async function quickOutNoPrint() {
+      if (!selectedItem) return;
+      const qty = Number(document.getElementById('mutasiQty').value);
+      if (!qty || qty <= 0) return alert('Masukkan jumlah yang valid.');
+      const ket = prompt('Keterangan pengeluaran (opsional):', 'Pemakaian bengkel');
+      if (ket === null) return;
 
       try {
         const res = await callApi('updateStock', {
           pin: currentPin,
           rowNumber: selectedItem.rowNumber,
-          type: mutasiMode,
+          type: 'OUT',
           qty: qty,
-          keterangan: keterangan
+          keterangan: ket
         });
-        selectedItem.penambahan = res.penambahan;
         selectedItem.pemakaian = res.pemakaian;
         selectedItem.saldo = res.saldo;
         showItemAction(selectedItem);
         renderStockList();
-        alert('Berhasil! Saldo terbaru: ' + res.saldo);
+        alert('Stok berhasil dikurangi. Saldo terbaru: ' + res.saldo);
+      } catch (err) {
+        alert('Gagal: ' + err.message);
+      }
+    }
+
+    // Penambahan stok (Masuk)
+    async function submitStockIn() {
+      if (!selectedItem) return;
+      const qty = Number(document.getElementById('mutasiQty').value);
+      const keterangan = document.getElementById('mutasiKet').value.trim();
+      if (!qty || qty <= 0) return alert('Masukkan jumlah yang valid.');
+
+      const btn = document.getElementById('btnSubmitIn');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const res = await callApi('updateStock', {
+          pin: currentPin,
+          rowNumber: selectedItem.rowNumber,
+          type: 'IN',
+          qty: qty,
+          keterangan: keterangan || 'Penambahan stok'
+        });
+        selectedItem.penambahan = res.penambahan;
+        selectedItem.saldo = res.saldo;
+        showItemAction(selectedItem);
+        renderStockList();
+        alert('Penambahan stok berhasil! Saldo terbaru: ' + res.saldo);
       } catch (err) {
         alert('Gagal: ' + err.message);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Simpan Perubahan Stok';
+        btn.textContent = '+ Simpan Penambahan Stok';
+      }
+    }
+
+    // ===== CETAK DOKUMEN BUKTI PENGELUARAN BARANG (BPB) =====
+    function renderAndPrintBPB(bpb) {
+      const printArea = document.getElementById('printArea');
+      printArea.className = 'mode-bpb';
+
+      const rowsHtml = bpb.items.map((item, idx) => `
+        <tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td style="font-family:monospace; text-align:center;">${escapeHtml(item.noKatalog)}</td>
+          <td>${escapeHtml(item.nama)}</td>
+          <td style="text-align:center;">${escapeHtml(item.lokasi)}</td>
+          <td style="text-align:center; font-weight:bold;">${item.qty}</td>
+          <td style="text-align:center;">${escapeHtml(item.satuan || 'Unit')}</td>
+        </tr>
+      `).join('');
+
+      printArea.innerHTML = `
+        <div class="bpb-box">
+          <div class="bpb-header">
+            <div style="font-size:13pt; font-weight:bold; letter-spacing:0.5px;">BUKTI PENGELUARAN BARANG (BPB)</div>
+            <div style="font-size:9.5pt; margin-top:2px;">GUDANG ELEKTRONIKA • BENGKEL ELEKTRONIKA • JURUSAN TEKNIK ELEKTRO</div>
+          </div>
+
+          <table style="width:100%; font-size:10pt; margin-bottom:10px;">
+            <tr>
+              <td style="width:18%;">No. Bukti</td>
+              <td style="width:32%;">: <strong>${escapeHtml(bpb.noBukti)}</strong></td>
+              <td style="width:18%;">Tanggal</td>
+              <td style="width:32%;">: ${escapeHtml(bpb.tanggal)}</td>
+            </tr>
+            <tr>
+              <td>Penerima</td>
+              <td>: ${escapeHtml(bpb.penerima)}</td>
+              <td>Keperluan</td>
+              <td>: ${escapeHtml(bpb.keperluan)}</td>
+            </tr>
+          </table>
+
+          <table class="bpb-table">
+            <thead>
+              <tr>
+                <th style="width:6%;">No</th>
+                <th style="width:16%;">No. Katalog</th>
+                <th>Nama Barang</th>
+                <th style="width:12%;">Lokasi Rak</th>
+                <th style="width:10%;">Jumlah</th>
+                <th style="width:12%;">Satuan</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+
+          <table style="width:100%; text-align:center; margin-top:20px; font-size:10pt;">
+            <tr>
+              <td style="width:50%;">
+                Yang Menerima,<br><br><br><br>
+                <strong>(${escapeHtml(bpb.penerima)})</strong>
+              </td>
+              <td style="width:50%;">
+                Palembang, ${escapeHtml(String(bpb.tanggal).split(' ')[0])}<br>
+                Pengelola Gudang Elektronika,<br><br><br>
+                <strong>(${escapeHtml(bpb.petugas)})</strong>
+              </td>
+            </tr>
+          </table>
+        </div>
+      `;
+
+      setTimeout(() => window.print(), 250);
+    }
+
+    async function reprintBPB(noBukti) {
+      try {
+        const bpbData = await callApi('getBpbDetail', { pin: currentPin, noBukti });
+        renderAndPrintBPB(bpbData);
+      } catch (err) {
+        alert('Gagal memuat BPB: ' + err.message);
       }
     }
 
@@ -604,7 +892,7 @@
           <td class="py-2.5 pr-2 text-right font-bold ${i.saldo <= 0 ? 'text-rose-600' : (i.saldo <= 10 ? 'text-amber-600' : 'text-emerald-700')}">${i.saldo}</td>
           <td class="py-2.5 text-right">
             <button onclick="selectFromRow(${i.rowNumber})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg">
-              Edit
+              Pilih
             </button>
           </td>
         </tr>
@@ -655,10 +943,13 @@
       renderPrintList();
     }
 
-    function executePrint() {
+    function executePrintLabels() {
       if (selectedPrintRows.size === 0) return alert('Pilih minimal 1 barang untuk dicetak.');
       const chosen = inventory.filter(i => selectedPrintRows.has(i.rowNumber));
-      document.getElementById('printArea').innerHTML = chosen.map((item, idx) => `
+      const printArea = document.getElementById('printArea');
+      printArea.className = 'mode-label';
+
+      printArea.innerHTML = chosen.map((item, idx) => `
         <div class="label-card">
           <div class="label-title">${escapeHtml(item.nama)}</div>
           <svg id="bc-${idx}" class="label-svg"></svg>
@@ -687,16 +978,27 @@
           return;
         }
         el.innerHTML = logs.map(l => `
-          <div class="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2">
+          <div class="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2 flex-wrap">
             <div>
               <p class="font-bold text-slate-800">${escapeHtml(l.nama)}</p>
-              <p class="text-xs text-slate-500">${l.waktu} • Katalog: ${l.noKatalog} • ${escapeHtml(l.keterangan)}</p>
+              <p class="text-xs text-slate-500">
+                ${l.waktu} • Katalog: ${l.noKatalog} • ${escapeHtml(l.keterangan)}
+                ${l.noBukti && l.noBukti !== '-' ? `• <strong class="text-blue-700">${escapeHtml(l.noBukti)}</strong> (${escapeHtml(l.penerima)})` : ''}
+              </p>
             </div>
-            <div class="text-right shrink-0">
-              <span class="inline-block px-2 py-0.5 rounded text-xs font-bold ${l.jenis.includes('MASUK') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                ${l.jenis} ${l.jumlah}
-              </span>
-              <p class="text-xs text-slate-500 mt-0.5">Saldo: <strong>${l.saldoAkhir}</strong></p>
+            <div class="flex items-center gap-2 shrink-0">
+              ${l.noBukti && l.noBukti !== '-' ? `
+                <button onclick="reprintBPB('${escapeHtml(l.noBukti)}')"
+                  class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg">
+                  🖨️ Cetak BPB
+                </button>
+              ` : ''}
+              <div class="text-right">
+                <span class="inline-block px-2 py-0.5 rounded text-xs font-bold ${l.jenis.includes('MASUK') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                  ${l.jenis} ${l.jumlah}
+                </span>
+                <p class="text-xs text-slate-500 mt-0.5">Saldo: <strong>${l.saldoAkhir}</strong></p>
+              </div>
             </div>
           </div>
         `).join('');
