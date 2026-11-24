@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Gudang Elektronika - Barcode Stock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <style>
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea {
+        position: absolute; left: 0; top: 0; width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4mm;
+      }
+      .label-card {
+        border: 1px dashed #64748b;
+        padding: 3mm 2mm;
+        text-align: center;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        height: 33mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        box-sizing: border-box;
+      }
+      .label-title {
+        font-size: 8.5pt; font-weight: 700; line-height: 1.15;
+        max-height: 2.3em; overflow: hidden; text-transform: uppercase; color: #000;
+      }
+      .label-loc { font-size: 7pt; color: #334155; }
+      .label-svg { max-width: 100%; height: 18mm; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-20 md:pb-8">
+
+  <!-- LAYAR LOGIN PIN -->
+  <div id="loginScreen" class="fixed inset-0 bg-slate-900/95 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+      <div class="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+        GE
+      </div>
+      <h1 class="text-xl font-bold text-slate-800">Gudang Elektronika</h1>
+      <p class="text-sm text-slate-500 mt-1 mb-5">Masukkan PIN Admin untuk mengelola stok</p>
+      <input id="pinInput" type="password" inputmode="numeric" placeholder="Masukkan PIN"
+        class="w-full text-center text-2xl tracking-widest border-2 border-slate-200 rounded-xl py-3 px-4 focus:border-blue-500 focus:outline-none mb-3"
+        onkeydown="if(event.key==='Enter') handleLogin()" />
+      <p id="pinError" class="text-red-500 text-xs mb-3 hidden">PIN salah. Silakan coba lagi.</p>
+      <button id="btnLogin" onclick="handleLogin()"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition">
+        Masuk Dashboard
+      </button>
+    </div>
+  </div>
+
+  <!-- HEADER UTAMA -->
+  <header class="bg-blue-700 text-white shadow sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div>
+        <h1 class="font-bold text-base md:text-lg leading-tight">Gudang Elektronika TE</h1>
+        <p class="text-xs text-blue-100">Manajemen Stok Barcode • 2026 Sem. 2</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="loadData()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-xs font-medium">
+          ↻ Refresh
+        </button>
+        <button onclick="logout()" class="bg-red-500/80 hover:bg-red-500 px-3 py-1.5 rounded-lg text-xs font-medium">
+          Keluar
+        </button>
+      </div>
+    </div>
+    <nav class="hidden md:flex max-w-5xl mx-auto px-4 gap-2 pb-2">
+      <button onclick="switchTab('scan')" id="dtab-scan" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-blue-700">📷 Scan Barcode</button>
+      <button onclick="switchTab('stock')" id="dtab-stock" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📦 Daftar Stok</button>
+      <button onclick="switchTab('print')" id="dtab-print" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">🖨️ Cetak Label A4</button>
+      <button onclick="switchTab('logs')" id="dtab-logs" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600">📋 Riwayat Mutasi</button>
+    </nav>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-4 space-y-4">
+    <div id="loadingBar" class="hidden bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl text-sm font-medium text-center">
+      Menghubungkan ke Google Sheets...
+    </div>
+
+    <!-- TAB 1: SCAN BARCODE -->
+    <section id="tab-scan" class="space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+        <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 class="font-bold text-slate-800">Scan Barcode Barang</h2>
+          <div class="flex gap-2">
+            <label for="barcodeFileInput"
+              class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg">
+              📸 Foto
+            </label>
+            <input id="barcodeFileInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="scanFromPhoto(event)" />
+
+            <button id="btnToggleCam" onclick="toggleCamera()"
+              class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg">
+              ▶ Kamera Live
+            </button>
+          </div>
+        </div>
+
+        <div id="reader" class="w-full max-w-md mx-auto rounded-xl overflow-hidden bg-slate-900 hidden mb-3"></div>
+
+        <div class="flex gap-2">
+          <input id="manualCode" type="text" placeholder="Ketik / Scan 16 digit atau 6 digit No. Katalog..."
+            class="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+            onkeydown="if(event.key==='Enter') searchByCode()" />
+          <button onclick="searchByCode()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold">
+            Cari
+          </button>
+        </div>
+      </div>
+
+      <div id="duplicateBox" class="hidden bg-amber-50 border border-amber-300 rounded-2xl p-4">
+        <p class="text-sm font-bold text-amber-800 mb-2">Ditemukan beberapa barang dengan No. Katalog sama. Pilih barang:</p>
+        <div id="duplicateList" class="space-y-2"></div>
+      </div>
+
+      <div id="itemActionCard" class="hidden bg-white rounded-2xl shadow-sm p-5 border-2 border-blue-500 space-y-4">
+        <div class="flex justify-between items-start gap-2">
+          <div>
+            <span id="actKatalog" class="inline-block bg-slate-100 text-slate-600 text-xs font-mono px-2 py-0.5 rounded"></span>
+            <span id="actLokasi" class="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded ml-1"></span>
+            <h3 id="actNama" class="text-lg font-bold text-slate-900 mt-1"></h3>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-xs text-slate-500">Saldo Saat Ini</p>
+            <p id="actSaldo" class="text-3xl font-extrabold text-blue-700">0</p>
+            <p id="actSatuan" class="text-xs text-slate-500">Unit</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center bg-slate-50 rounded-xl p-2.5 text-xs">
+          <div><span class="text-slate-400 block">Stok Awal</span><strong id="actAwal">0</strong></div>
+          <div><span class="text-emerald-600 block">Penambahan</span><strong id="actIn">0</strong></div>
+          <div><span class="text-rose-600 block">Pemakaian</span><strong id="actOut">0</strong></div>
+        </div>
+
+        <div class="space-y-3 pt-2 border-t border-slate-100">
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnModeOut" onclick="setMutasiMode('OUT')"
+              class="py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 bg-rose-500 text-white">
+              − Kurangi Stok
+            </button>
+            <button id="btnModeIn" onclick="setMutasiMode('IN')"
+              class="py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 text-emerald-600 bg-white">
+              + Tambah Stok
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600">Jumlah</label>
+              <input id="mutasiQty" type="number" min="1" value="1"
+                class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-base font-bold mt-1 focus:border-blue-500 focus:outline-none" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-xs font-semibold text-slate-600">Keterangan / Nama Pengambil</label>
+              <input id="mutasiKet" type="text" placeholder="Contoh: Praktikum Elektronika / Pengadaan"
+                class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm mt-1 focus:border-blue-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <button id="btnSubmitMutasi" onclick="submitMutasi()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow">
+            Simpan Perubahan Stok
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DAFTAR STOK -->
+    <section id="tab-stock" class="hidden space-y-4">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200">
+          <p class="text-xs text-slate-500">Total Item</p>
+          <p id="statTotal" class="text-2xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="bg-white p-3.5 rounded-2xl border border-emerald-200">
+          <p class="text-xs text-emerald-600">Stok Aman (&gt;10)</p>
+          <p id="statAman" class="text-2xl font-bold text-emerald-700">0</p>
+        </div>
+        <div class="bg-white p-3.5 rounded-2xl border border-amber-200">
+          <p class="text-xs text-amber-600">Menipis (1–10)</p>
+          <p id="statMenipis" class="text-2xl font-bold text-amber-600">0</p>
+        </div>
+        <div class="bg-white p-3.5 rounded-2xl border border-rose-200">
+          <p class="text-xs text-rose-600">Stok Habis (0)</p>
+          <p id="statHabis" class="text-2xl font-bold text-rose-600">0</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div class="flex flex-col md:flex-row gap-2">
+          <input id="stockSearch" type="text" placeholder="Cari nama barang, No. Katalog, atau rak..."
+            oninput="renderStockList()"
+            class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+          <select id="stockFilter" onchange="renderStockList()"
+            class="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+            <option value="ALL">Semua Status</option>
+            <option value="AVAILABLE">Tersedia (&gt;0)</option>
+            <option value="LOW">Menipis (1–10)</option>
+            <option value="EMPTY">Habis (0)</option>
+          </select>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 text-xs">
+                <th class="py-2 pr-2">Katalog</th>
+                <th class="py-2 pr-2">Nama Barang</th>
+                <th class="py-2 pr-2">Rak</th>
+                <th class="py-2 pr-2 text-right">Saldo</th>
+                <th class="py-2 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: CETAK LABEL A4 -->
+    <section id="tab-print" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 class="font-bold text-slate-800">Cetak Label Barcode (Kertas A4)</h2>
+            <p class="text-xs text-slate-500">Format Code 128 (16 digit) • 24 label per halaman A4 (3 kolom × 8 baris)</p>
+          </div>
+          <button onclick="executePrint()"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow">
+            🖨️ Cetak Label Terpilih (<span id="selectedCount">0</span>)
+          </button>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-2">
+          <input id="printSearch" type="text" placeholder="Filter nama barang, katalog, atau lokasi rak..."
+            oninput="renderPrintList()"
+            class="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm" />
+          <select id="printStockFilter" onchange="renderPrintList()"
+            class="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+            <option value="AVAILABLE">Hanya Stok &gt; 0</option>
+            <option value="ALL">Semua Barang</option>
+          </select>
+          <button onclick="toggleSelectVisible(true)" class="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-2 rounded-xl text-xs font-semibold">
+            Pilih Semua Tampil
+          </button>
+          <button onclick="toggleSelectVisible(false)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl text-xs font-semibold">
+            Reset Pilihan
+          </button>
+        </div>
+
+        <div id="printChecklist" class="max-h-96 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: RIWAYAT MUTASI -->
+    <section id="tab-logs" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-bold text-slate-800">30 Riwayat Mutasi Terakhir</h2>
+          <button onclick="loadLogs()" class="text-xs text-blue-600 font-semibold">↻ Muat Ulang</button>
+        </div>
+        <div id="logsContainer" class="space-y-2 text-sm"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="printArea" class="hidden"></div>
+
+  <!-- NAVIGASI BAWAH (MOBILE) -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-4 text-center z-30">
+    <button onclick="switchTab('scan')" id="mtab-scan" class="py-2.5 text-xs font-semibold text-blue-600">📷<span class="block mt-0.5">Scan</span></button>
+    <button onclick="switchTab('stock')" id="mtab-stock" class="py-2.5 text-xs font-semibold text-slate-500">📦<span class="block mt-0.5">Stok</span></button>
+    <button onclick="switchTab('print')" id="mtab-print" class="py-2.5 text-xs font-semibold text-slate-500">🖨️<span class="block mt-0.5">Label</span></button>
+    <button onclick="switchTab('logs')" id="mtab-logs" class="py-2.5 text-xs font-semibold text-slate-500">📋<span class="block mt-0.5">Log</span></button>
+  </nav>
+
+  <script>
+    // ================= TEMPEL URL WEB APP APPS SCRIPT DI SINI =================
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxthUDGqrSx40KtnEihlA1TcJU8oRRUTDhQdv_0KwjykN55-N6ML-6rHI8M1j5Rtscs/exec';
+    // ==========================================================================
+
+    let currentPin = '';
+    let inventory = [];
+    let selectedItem = null;
+    let mutasiMode = 'OUT';
+    let selectedPrintRows = new Set();
+    let html5QrCode = null;
+    let isCameraRunning = false;
+
+    // Helper panggil API Apps Script (tanpa CORS preflight)
+    async function callApi(action, params = {}) {
+      if (!API_URL || API_URL.includes('PASTE_URL')) {
+        throw new Error('URL API Apps Script belum diisi di file index.html.');
+      }
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, ...params })
+      });
+      const result = await response.json();
+      if (result.status === 'error') {
+        throw new Error(result.message || 'Terjadi kesalahan di server.');
+      }
+      return result.data;
+    }
+
+    // Bunyi beep saat barcode berhasil terbaca
+    function playBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } catch (e) {}
+    }
+
+    // ===== AUTHENTICATION =====
+    async function handleLogin() {
+      const pin = document.getElementById('pinInput').value.trim();
+      if (!pin) return;
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true;
+      btn.textContent = 'Memverifikasi...';
+
+      try {
+        const ok = await callApi('verifyPin', { pin });
+        if (ok) {
+          currentPin = pin;
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('pinError').classList.add('hidden');
+          await loadData();
+        } else {
+          document.getElementById('pinError').classList.remove('hidden');
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Masuk Dashboard';
+      }
+    }
+
+    function logout() {
+      stopCamera();
+      currentPin = '';
+      document.getElementById('pinInput').value = '';
+      document.getElementById('loginScreen').classList.remove('hidden');
+    }
+
+    // ===== LOAD DATA =====
+    async function loadData() {
+      document.getElementById('loadingBar').classList.remove('hidden');
+      try {
+        const res = await callApi('getInventoryData', { pin: currentPin });
+        inventory = res.items || [];
+        document.getElementById('statTotal').textContent = res.stats.totalItem;
+        document.getElementById('statAman').textContent = res.stats.aman;
+        document.getElementById('statMenipis').textContent = res.stats.menipis;
+        document.getElementById('statHabis').textContent = res.stats.habis;
+        renderStockList();
+        renderPrintList();
+        if (selectedItem) {
+          const refreshed = inventory.find(i => i.rowNumber === selectedItem.rowNumber);
+          if (refreshed) showItemAction(refreshed);
+        }
+      } catch (err) {
+        alert('Gagal memuat data: ' + err.message);
+      } finally {
+        document.getElementById('loadingBar').classList.add('hidden');
+      }
+    }
+
+    // ===== NAVIGATION =====
+    function switchTab(tab) {
+      if (tab !== 'scan') stopCamera();
+      ['scan', 'stock', 'print', 'logs'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+        const dt = document.getElementById('dtab-' + t);
+        const mt = document.getElementById('mtab-' + t);
+        if (t === tab) {
+          dt.className = 'tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-white text-blue-700';
+          mt.className = 'py-2.5 text-xs font-semibold text-blue-600';
+        } else {
+          dt.className = 'tab-btn px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:bg-blue-600';
+          mt.className = 'py-2.5 text-xs font-semibold text-slate-500';
+        }
+      });
+      if (tab === 'logs') loadLogs();
+    }
+
+    // ===== KAMERA LIVE & FOTO =====
+    function toggleCamera() {
+      if (isCameraRunning) stopCamera();
+      else startCamera();
+    }
+
+    function startCamera() {
+      const readerEl = document.getElementById('reader');
+      readerEl.classList.remove('hidden');
+      const btn = document.getElementById('btnToggleCam');
+      btn.textContent = '⏹ Hentikan';
+      btn.className = 'bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-2 rounded-lg';
+
+      html5QrCode = new Html5Qrcode('reader');
+      const config = {
+        fps: 12,
+        qrbox: { width: 280, height: 120 },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      };
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        config,
+        (decodedText) => {
+          playBeep();
+          document.getElementById('manualCode').value = decodedText;
+          stopCamera();
+          searchByCode();
+        },
+        () => {}
+      ).then(() => {
+        isCameraRunning = true;
+      }).catch(err => {
+        alert('Kamera tidak dapat diakses. Pastikan izin kamera diizinkan.\nDetail: ' + err);
+        stopCamera();
+      });
+    }
+
+    function stopCamera() {
+      if (html5QrCode && isCameraRunning) {
+        html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+      }
+      isCameraRunning = false;
+      document.getElementById('reader').classList.add('hidden');
+      const btn = document.getElementById('btnToggleCam');
+      btn.textContent = '▶ Kamera Live';
+      btn.className = 'bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg';
+    }
+
+    function scanFromPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const scanner = new Html5Qrcode('reader');
+      scanner.scanFile(file, false)
+        .then(decodedText => {
+          playBeep();
+          document.getElementById('manualCode').value = decodedText;
+          searchByCode();
+          event.target.value = '';
+        })
+        .catch(() => {
+          alert('Barcode tidak terbaca dari foto. Pastikan foto fokus, terang, dan tidak miring.');
+          event.target.value = '';
+        });
+    }
+
+    // ===== PENCARIAN & UPDATE STOK =====
+    function searchByCode() {
+      const raw = document.getElementById('manualCode').value.trim();
+      if (!raw) return;
+
+      const last6 = raw.length >= 6 ? raw.slice(-6) : raw.padStart(6, '0');
+      const matches = inventory.filter(i => i.barcode === raw || i.noKatalog === raw || i.noKatalog === last6);
+
+      document.getElementById('duplicateBox').classList.add('hidden');
+      document.getElementById('itemActionCard').classList.add('hidden');
+
+      if (matches.length === 0) {
+        alert('Kode "' + raw + '" tidak ditemukan di database.');
+        return;
+      }
+
+      if (matches.length === 1) {
+        showItemAction(matches[0]);
+      } else {
+        document.getElementById('duplicateList').innerHTML = matches.map(m => `
+          <button onclick="selectFromRow(${m.rowNumber})"
+            class="w-full text-left bg-white hover:bg-amber-100 border border-amber-200 rounded-xl p-3 flex justify-between items-center">
+            <div>
+              <p class="font-bold text-slate-800 text-sm">${escapeHtml(m.nama)}</p>
+              <p class="text-xs text-slate-500">Baris ${m.rowNumber} • Rak: ${escapeHtml(m.lokasi)}</p>
+            </div>
+            <span class="font-bold text-blue-700 text-sm">Saldo: ${m.saldo}</span>
+          </button>
+        `).join('');
+        document.getElementById('duplicateBox').classList.remove('hidden');
+      }
+    }
+
+    function selectFromRow(rowNumber) {
+      const item = inventory.find(i => i.rowNumber === rowNumber);
+      if (item) {
+        document.getElementById('duplicateBox').classList.add('hidden');
+        switchTab('scan');
+        showItemAction(item);
+      }
+    }
+
+    function showItemAction(item) {
+      selectedItem = item;
+      document.getElementById('actKatalog').textContent = item.barcode;
+      document.getElementById('actLokasi').textContent = 'Rak: ' + item.lokasi;
+      document.getElementById('actNama').textContent = item.nama;
+      document.getElementById('actSaldo').textContent = item.saldo;
+      document.getElementById('actSatuan').textContent = item.satuan;
+      document.getElementById('actAwal').textContent = item.stokAwal;
+      document.getElementById('actIn').textContent = item.penambahan;
+      document.getElementById('actOut').textContent = item.pemakaian;
+      document.getElementById('mutasiQty').value = 1;
+      document.getElementById('mutasiKet').value = '';
+      document.getElementById('itemActionCard').classList.remove('hidden');
+    }
+
+    function setMutasiMode(mode) {
+      mutasiMode = mode;
+      const btnOut = document.getElementById('btnModeOut');
+      const btnIn = document.getElementById('btnModeIn');
+      if (mode === 'OUT') {
+        btnOut.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 bg-rose-500 text-white';
+        btnIn.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 text-emerald-600 bg-white';
+      } else {
+        btnIn.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-emerald-500 bg-emerald-500 text-white';
+        btnOut.className = 'py-2.5 rounded-xl font-bold text-sm border-2 border-rose-500 text-rose-600 bg-white';
+      }
+    }
+
+    async function submitMutasi() {
+      if (!selectedItem) return;
+      const qty = Number(document.getElementById('mutasiQty').value);
+      const keterangan = document.getElementById('mutasiKet').value.trim();
+      if (!qty || qty <= 0) return alert('Masukkan jumlah yang valid.');
+
+      const btn = document.getElementById('btnSubmitMutasi');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan ke Google Sheets...';
+
+      try {
+        const res = await callApi('updateStock', {
+          pin: currentPin,
+          rowNumber: selectedItem.rowNumber,
+          type: mutasiMode,
+          qty: qty,
+          keterangan: keterangan
+        });
+        selectedItem.penambahan = res.penambahan;
+        selectedItem.pemakaian = res.pemakaian;
+        selectedItem.saldo = res.saldo;
+        showItemAction(selectedItem);
+        renderStockList();
+        alert('Berhasil! Saldo terbaru: ' + res.saldo);
+      } catch (err) {
+        alert('Gagal: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan Perubahan Stok';
+      }
+    }
+
+    // ===== DAFTAR STOK =====
+    function renderStockList() {
+      const q = document.getElementById('stockSearch').value.toLowerCase();
+      const f = document.getElementById('stockFilter').value;
+
+      const filtered = inventory.filter(i => {
+        if (f === 'AVAILABLE' && i.saldo <= 0) return false;
+        if (f === 'LOW' && (i.saldo <= 0 || i.saldo > 10)) return false;
+        if (f === 'EMPTY' && i.saldo > 0) return false;
+        if (q && !(i.nama.toLowerCase().includes(q) || i.noKatalog.includes(q) || i.lokasi.toLowerCase().includes(q))) {
+          return false;
+        }
+        return true;
+      }).slice(0, 150);
+
+      document.getElementById('stockTableBody').innerHTML = filtered.map(i => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2.5 pr-2 font-mono text-xs text-slate-500">${i.noKatalog}</td>
+          <td class="py-2.5 pr-2 font-medium text-slate-800">${escapeHtml(i.nama)}</td>
+          <td class="py-2.5 pr-2 text-xs text-slate-500">${escapeHtml(i.lokasi)}</td>
+          <td class="py-2.5 pr-2 text-right font-bold ${i.saldo <= 0 ? 'text-rose-600' : (i.saldo <= 10 ? 'text-amber-600' : 'text-emerald-700')}">${i.saldo}</td>
+          <td class="py-2.5 text-right">
+            <button onclick="selectFromRow(${i.rowNumber})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg">
+              Edit
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ===== CETAK LABEL A4 =====
+    function getFilteredPrintItems() {
+      const q = document.getElementById('printSearch').value.toLowerCase();
+      const f = document.getElementById('printStockFilter').value;
+      return inventory.filter(i => {
+        if (f === 'AVAILABLE' && i.saldo <= 0) return false;
+        if (q && !(i.nama.toLowerCase().includes(q) || i.noKatalog.includes(q) || i.lokasi.toLowerCase().includes(q))) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function renderPrintList() {
+      const items = getFilteredPrintItems();
+      document.getElementById('printChecklist').innerHTML = items.slice(0, 250).map(i => {
+        const checked = selectedPrintRows.has(i.rowNumber) ? 'checked' : '';
+        return `
+          <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer text-sm">
+            <input type="checkbox" ${checked} onchange="togglePrintRow(${i.rowNumber}, this.checked)" class="w-4 h-4 accent-blue-600">
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-slate-800 truncate">${escapeHtml(i.nama)}</p>
+              <p class="text-xs text-slate-500 font-mono">${i.barcode} • Rak: ${escapeHtml(i.lokasi)} • Saldo: ${i.saldo}</p>
+            </div>
+          </label>
+        `;
+      }).join('');
+      document.getElementById('selectedCount').textContent = selectedPrintRows.size;
+    }
+
+    function togglePrintRow(rowNum, isChecked) {
+      if (isChecked) selectedPrintRows.add(rowNum);
+      else selectedPrintRows.delete(rowNum);
+      document.getElementById('selectedCount').textContent = selectedPrintRows.size;
+    }
+
+    function toggleSelectVisible(selectAll) {
+      getFilteredPrintItems().forEach(i => {
+        if (selectAll) selectedPrintRows.add(i.rowNumber);
+        else selectedPrintRows.delete(i.rowNumber);
+      });
+      renderPrintList();
+    }
+
+    function executePrint() {
+      if (selectedPrintRows.size === 0) return alert('Pilih minimal 1 barang untuk dicetak.');
+      const chosen = inventory.filter(i => selectedPrintRows.has(i.rowNumber));
+      document.getElementById('printArea').innerHTML = chosen.map((item, idx) => `
+        <div class="label-card">
+          <div class="label-title">${escapeHtml(item.nama)}</div>
+          <svg id="bc-${idx}" class="label-svg"></svg>
+          <div class="label-loc">Rak: ${escapeHtml(item.lokasi)}</div>
+        </div>
+      `).join('');
+
+      chosen.forEach((item, idx) => {
+        JsBarcode('#bc-' + idx, item.barcode, {
+          format: 'CODE128', width: 1.35, height: 36,
+          displayValue: true, fontSize: 10, margin: 2
+        });
+      });
+
+      setTimeout(() => window.print(), 300);
+    }
+
+    // ===== RIWAYAT MUTASI =====
+    async function loadLogs() {
+      const el = document.getElementById('logsContainer');
+      el.innerHTML = '<p class="text-slate-400 text-center py-4">Memuat riwayat...</p>';
+      try {
+        const logs = await callApi('getRecentLogs', { pin: currentPin });
+        if (!logs.length) {
+          el.innerHTML = '<p class="text-slate-400 text-center py-4">Belum ada mutasi tercatat.</p>';
+          return;
+        }
+        el.innerHTML = logs.map(l => `
+          <div class="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2">
+            <div>
+              <p class="font-bold text-slate-800">${escapeHtml(l.nama)}</p>
+              <p class="text-xs text-slate-500">${l.waktu} • Katalog: ${l.noKatalog} • ${escapeHtml(l.keterangan)}</p>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-bold ${l.jenis.includes('MASUK') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                ${l.jenis} ${l.jumlah}
+              </span>
+              <p class="text-xs text-slate-500 mt-0.5">Saldo: <strong>${l.saldoAkhir}</strong></p>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        el.innerHTML = '<p class="text-rose-500 text-center py-4">Gagal memuat riwayat: ' + escapeHtml(err.message) + '</p>';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+  </script>
+</body>
+</html>
