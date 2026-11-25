@@ -19,31 +19,48 @@
         width: 100%;
       }
 
-      /* MODE 1: CETAK LABEL BARCODE A4 */
+      /* MODE 1: CETAK LABEL BARCODE A4 (8 cm x 2,5 cm) */
       #printArea.mode-label {
         display: grid !important;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 4mm;
+        grid-template-columns: repeat(2, 80mm);
+        justify-content: center;
+        gap: 3mm 5mm;
       }
       .label-card {
         border: 1px dashed #64748b;
-        padding: 3mm 2mm;
+        width: 80mm;
+        height: 25mm;
+        padding: 1.5mm 2mm;
         text-align: center;
         page-break-inside: avoid;
         break-inside: avoid;
-        height: 33mm;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         align-items: center;
         box-sizing: border-box;
+        overflow: hidden;
       }
       .label-title {
-        font-size: 8.5pt; font-weight: 700; line-height: 1.15;
-        max-height: 2.3em; overflow: hidden; text-transform: uppercase; color: #000;
+        font-size: 7.5pt;
+        font-weight: 700;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 76mm;
+        text-transform: uppercase;
+        color: #000;
       }
-      .label-loc { font-size: 7pt; color: #334155; }
-      .label-svg { max-width: 100%; height: 18mm; }
+      .label-loc {
+        font-size: 6.5pt;
+        line-height: 1;
+        color: #334155;
+      }
+      .label-svg {
+        max-width: 76mm;
+        height: 14mm;
+      }
 
       /* MODE 2: CETAK BUKTI PENGELUARAN BARANG (BPB) */
       #printArea.mode-bpb {
@@ -992,10 +1009,14 @@
         </div>
       `).join('');
 
-      chosen.forEach((item, idx) => {
+     chosen.forEach((item, idx) => {
         JsBarcode('#bc-' + idx, item.barcode, {
-          format: 'CODE128', width: 1.35, height: 36,
-          displayValue: true, fontSize: 10, margin: 2
+          format: 'CODE128',
+          width: 1.5,
+          height: 28,
+          displayValue: true,
+          fontSize: 9,
+          margin: 1
         });
       });
 
