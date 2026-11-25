@@ -742,27 +742,33 @@
     }
 
     // ===== PENCARIAN BARANG =====
-    function searchByCode() {
+   function searchByCode() {
       const raw = document.getElementById('manualCode').value.trim();
       if (!raw) return;
 
+      const q = raw.toLowerCase();
       const last6 = raw.length >= 6 ? raw.slice(-6) : raw.padStart(6, '0');
-      const matches = inventory.filter(i => i.barcode === raw || i.noKatalog === raw || i.noKatalog === last6);
+      const matches = inventory.filter(i =>
+        i.barcode === raw ||
+        i.noKatalog === raw ||
+        i.noKatalog === last6 ||
+        i.nama.toLowerCase().includes(q)
+      );
 
       document.getElementById('duplicateBox').classList.add('hidden');
       document.getElementById('itemActionCard').classList.add('hidden');
 
-      if (matches.length === 0) return alert('Kode "' + raw + '" tidak ditemukan.');
+      if (matches.length === 0) return alert('Barang atau kode "' + raw + '" tidak ditemukan.');
 
       if (matches.length === 1) {
         showItemAction(matches[0]);
       } else {
-        document.getElementById('duplicateList').innerHTML = matches.map(m => `
+        document.getElementById('duplicateList').innerHTML = matches.slice(0, 25).map(m => `
           <button onclick="selectFromRow(${m.rowNumber})"
             class="w-full text-left bg-white hover:bg-amber-100 border border-amber-200 rounded-xl p-3 flex justify-between items-center">
             <div>
               <p class="font-bold text-slate-800 text-sm">${escapeHtml(m.nama)}</p>
-              <p class="text-xs text-slate-500">Baris ${m.rowNumber} • Rak: ${escapeHtml(m.lokasi)}</p>
+              <p class="text-xs text-slate-500">Katalog: ${m.noKatalog} • Rak: ${escapeHtml(m.lokasi)}</p>
             </div>
             <span class="font-bold text-blue-700 text-sm">Saldo: ${m.saldo}</span>
           </button>
