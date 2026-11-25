@@ -9,7 +9,6 @@
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    /* Tampilan Kartu Stock Digital di Layar */
     .ks-sheet {
       background: #fff;
       border: 1.5px solid #1e293b;
@@ -29,7 +28,7 @@
       #printArea, #printArea * { visibility: visible; }
       #printArea { position: absolute; left: 0; top: 0; width: 100%; }
 
-      /* MODE 1: LABEL HYBRID (8 cm x 2,5 cm) - BARCODE KIRI + QR KANAN */
+      /* MODE 1: LABEL HYBRID (8 cm x 2,5 cm) */
       #printArea.mode-label {
         display: grid !important;
         grid-template-columns: repeat(2, 80mm);
@@ -87,25 +86,15 @@
       .bpb-table th { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
       /* MODE 3: KARTU STOCK BARANG POLSRI */
-      #printArea.mode-kartu {
-        display: block !important;
-      }
-      #printArea.mode-kartu .ks-sheet {
-        border: 1.5px solid #000;
-        max-width: 100%;
-        padding: 12px 16px;
-      }
-      #printArea.mode-kartu .ks-table th {
-        background: #f1f5f9 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
+      #printArea.mode-kartu { display: block !important; }
+      #printArea.mode-kartu .ks-sheet { border: 1.5px solid #000; max-width: 100%; padding: 12px 16px; }
+      #printArea.mode-kartu .ks-table th { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen pb-20 md:pb-8">
 
-  <!-- MODE PUBLIK / READ-ONLY KARTU STOCK (SAAT SCAN QR DARI KAMERA HP BIASA) -->
+  <!-- MODE PUBLIK / READ-ONLY KARTU STOCK (SCAN QR) -->
   <div id="publicCardScreen" class="hidden min-h-screen bg-slate-100 p-3 md:p-6">
     <div class="max-w-3xl mx-auto space-y-3">
       <div class="flex justify-between items-center bg-blue-700 text-white px-4 py-3 rounded-xl shadow">
@@ -124,7 +113,7 @@
     </div>
   </div>
 
-  <!-- MODAL KARTU STOCK (DI DALAM DASHBOARD ADMIN) -->
+  <!-- MODAL KARTU STOCK (ADMIN) -->
   <div id="stockCardModal" class="hidden fixed inset-0 bg-slate-900/80 z-50 overflow-y-auto p-3 md:p-6">
     <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
       <div class="bg-slate-800 text-white px-4 py-3 flex justify-between items-center">
@@ -185,7 +174,7 @@
       <section id="tab-scan" class="space-y-4">
         <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
           <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <h2 class="font-bold text-slate-800">Scan Barcode Barang</h2>
+            <h2 class="font-bold text-slate-800">Scan / Cari Barang</h2>
             <div class="flex gap-2">
               <label for="barcodeFileInput" class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg">📸 Foto</label>
               <input id="barcodeFileInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="scanFromPhoto(event)" />
@@ -194,7 +183,7 @@
           </div>
           <div id="reader" class="w-full max-w-md mx-auto rounded-xl overflow-hidden bg-slate-900 hidden mb-3"></div>
           <div class="flex gap-2">
-            <input id="manualCode" type="text" placeholder="Ketik / Scan 16 digit atau 6 digit No. Katalog..."
+            <input id="manualCode" type="text" placeholder="Ketik Nama Barang, 6 digit No. Katalog, atau 16 digit Barcode..."
               class="flex-1 border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
               onkeydown="if(event.key==='Enter') searchByCode()" />
             <button onclick="searchByCode()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold">Cari</button>
@@ -227,8 +216,8 @@
         </div>
 
         <div id="duplicateBox" class="hidden bg-amber-50 border border-amber-300 rounded-2xl p-4">
-          <p class="text-sm font-bold text-amber-800 mb-2">Ditemukan beberapa barang dengan No. Katalog sama. Pilih barang:</p>
-          <div id="duplicateList" class="space-y-2"></div>
+          <p class="text-sm font-bold text-amber-800 mb-2">Pilih barang yang dimaksud:</p>
+          <div id="duplicateList" class="space-y-2 max-h-72 overflow-y-auto"></div>
         </div>
 
         <div id="itemActionCard" class="hidden bg-white rounded-2xl shadow-sm p-5 border-2 border-blue-500 space-y-4">
@@ -347,14 +336,76 @@
         </div>
       </section>
 
-      <!-- TAB 4: RIWAYAT MUTASI & AUDIT -->
+      <!-- TAB 4: RIWAYAT MUTASI, AUDIT & HAPUS RIWAYAT -->
       <section id="tab-logs" class="hidden space-y-4">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
-          <div class="flex justify-between items-center">
+          <div class="flex justify-between items-center flex-wrap gap-2">
             <h2 class="font-bold text-slate-800">Pencarian Riwayat Mutasi & Audit</h2>
-            <button onclick="resetLogFilter()" class="text-xs text-slate-500 hover:text-blue-600 font-semibold">Reset Filter</button>
+            <div class="flex items-center gap-2">
+              <button onclick="toggleDeletePanel()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-1.5 rounded-lg">
+                🗑️ Hapus Riwayat Massal
+              </button>
+              <button onclick="resetLogFilter()" class="text-xs text-slate-500 hover:text-blue-600 font-semibold">Reset Filter</button>
+            </div>
           </div>
 
+          <!-- PANEL HAPUS RIWAYAT MASSAL -->
+          <div id="deleteLogPanel" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-3.5 space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="text-sm font-bold text-rose-800">Hapus Riwayat & Sinkronisasi Kartu Stock</h3>
+              <button onclick="toggleDeletePanel()" class="text-xs text-rose-600 font-semibold">✕ Tutup</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>
+                <label class="text-xs font-semibold text-rose-900">Mode Penghapusan</label>
+                <select id="delMode" onchange="updateDeleteInputs()" class="w-full border border-rose-300 rounded-lg px-2.5 py-2 text-sm mt-1 bg-white">
+                  <option value="BY_ITEM">Hapus per Barang</option>
+                  <option value="BY_DATE">Hapus per Tanggal</option>
+                  <option value="ALL">Hapus Semua Riwayat</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold text-rose-900">Jenis Mutasi</label>
+                <select id="delJenis" class="w-full border border-rose-300 rounded-lg px-2.5 py-2 text-sm mt-1 bg-white">
+                  <option value="OUT">Hanya Pengeluaran (-)</option>
+                  <option value="ALL">Semua (Masuk & Keluar)</option>
+                  <option value="IN">Hanya Penambahan (+)</option>
+                </select>
+              </div>
+
+              <div id="delWrapItem">
+                <label class="text-xs font-semibold text-rose-900">Nama Barang / No. Katalog</label>
+                <input id="delItemQuery" type="text" placeholder="Misal: 000779 atau Resistor 1K"
+                  class="w-full border border-rose-300 rounded-lg px-3 py-2 text-sm mt-1 bg-white" />
+              </div>
+
+              <div id="delWrapDate" class="hidden md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-semibold text-rose-900">Dari Tanggal</label>
+                  <input id="delStartDate" type="date" class="w-full border border-rose-300 rounded-lg px-2.5 py-2 text-sm mt-1 bg-white" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-rose-900">Sampai Tanggal (kosongkan jika 1 hari)</label>
+                  <input id="delEndDate" type="date" class="w-full border border-rose-300 rounded-lg px-2.5 py-2 text-sm mt-1 bg-white" />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-rose-200">
+              <label class="flex items-center gap-2 text-xs font-semibold text-rose-900 cursor-pointer">
+                <input id="delRollback" type="checkbox" checked class="w-4 h-4 accent-rose-600" />
+                Kembalikan angka stok di Google Sheets & Kartu Stock (uncheck jika hanya bersih-bersih log lama)
+              </label>
+              <button id="btnExecBulkDel" onclick="executeBulkDelete()"
+                class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shrink-0 shadow">
+                🗑️ Eksekusi Hapus
+              </button>
+            </div>
+          </div>
+
+          <!-- PANEL FILTER PENCARIAN -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
             <div class="md:col-span-4">
               <label class="text-xs font-semibold text-slate-600">Cari Barang / Katalog / Penerima / BPB</label>
@@ -404,7 +455,7 @@
 
   <script>
     // ================= TEMPEL URL WEB APP APPS SCRIPT DI SINI =================
-    const API_URL = 'https://script.google.com/macros/s/AKfycbytNaBeLg6ueq8dngHNW_ZsVQGLD3lPIsZWmJFCTWNRiPjGRLBCTpaS7KnA_lA4PVVP/exec';
+    const API_URL = 'https://script.google.com/a/macros/polsri.ac.id/s/AKfycbytNaBeLg6ueq8dngHNW_ZsVQGLD3lPIsZWmJFCTWNRiPjGRLBCTpaS7KnA_lA4PVVP/exec';
     // ==========================================================================
 
     let currentPin = '';
@@ -417,7 +468,6 @@
     let isCameraRunning = false;
     let activeStockCardData = null;
 
-    // Cek apakah dibuka lewat Scan QR (?katalog=...)
     window.addEventListener('DOMContentLoaded', () => {
       const params = new URLSearchParams(window.location.search);
       const kat = params.get('katalog');
@@ -500,7 +550,6 @@
 
       return `
         <div class="ks-sheet">
-          <!-- KOP POLSRI -->
           <div style="display:flex; align-items:center; gap:10px; border-bottom:2px solid #000; padding-bottom:8px; margin-bottom:10px;">
             <img src="logo-polsri.png" onerror="this.style.display='none'" style="width:52px; height:52px; object-fit:contain;" alt="Logo Polsri">
             <div style="flex:1; text-align:center; line-height:1.25;">
@@ -515,7 +564,6 @@
             KARTU STOCK BARANG
           </div>
 
-          <!-- IDENTITAS BARANG + BARCODE -->
           <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
             <table style="font-size:9.5pt; line-height:1.45;">
               <tr><td style="font-weight:600; padding-right:8px;">Nama Barang</td><td>: <strong>${escapeHtml(item.nama)}</strong></td></tr>
@@ -527,7 +575,6 @@
             </div>
           </div>
 
-          <!-- TABEL MUTASI -->
           <table class="ks-table">
             <thead>
               <tr>
@@ -696,7 +743,6 @@
         },
         (decodedText) => {
           playBeep();
-          // Jika yang terscan adalah QR URL, ambil parameter katalognya
           let code = decodedText;
           if (decodedText.includes('katalog=')) {
             const u = new URL(decodedText);
@@ -741,8 +787,8 @@
         .catch(() => { alert('Barcode tidak terbaca dari foto.'); event.target.value = ''; });
     }
 
-    // ===== PENCARIAN BARANG =====
-   function searchByCode() {
+    // ===== PENCARIAN BARANG (NAMA / KATALOG / BARCODE) =====
+    function searchByCode() {
       const raw = document.getElementById('manualCode').value.trim();
       if (!raw) return;
 
@@ -1080,13 +1126,103 @@
       setTimeout(() => window.print(), 400);
     }
 
-    // ===== RIWAYAT MUTASI & AUDIT =====
+    // ===== RIWAYAT MUTASI, AUDIT & HAPUS RIWAYAT =====
     function resetLogFilter() {
       document.getElementById('logSearch').value = '';
       document.getElementById('logJenis').value = 'OUT';
       document.getElementById('logStartDate').value = '';
       document.getElementById('logEndDate').value = '';
       loadLogs();
+    }
+
+    function toggleDeletePanel() {
+      document.getElementById('deleteLogPanel').classList.toggle('hidden');
+      updateDeleteInputs();
+    }
+
+    function updateDeleteInputs() {
+      const mode = document.getElementById('delMode').value;
+      document.getElementById('delWrapItem').classList.toggle('hidden', mode !== 'BY_ITEM');
+      document.getElementById('delWrapDate').classList.toggle('hidden', mode !== 'BY_DATE');
+    }
+
+    async function deleteSingleLog(logRow, waktu, nama, jumlah) {
+      const konfirmasi = confirm(
+        `Hapus riwayat ini?\n\nBarang: ${nama}\nWaktu: ${waktu}\nJumlah: ${jumlah}\n\nRiwayat ini juga akan hilang dari Kartu Stock.`
+      );
+      if (!konfirmasi) return;
+
+      const rollbackStock = confirm(
+        'Apakah angka stok barang ini di Google Sheets juga ingin dikembalikan (rollback)?\n\n• Klik OK = Kembalikan stok\n• Klik Cancel = Hapus riwayat saja tanpa ubah stok'
+      );
+
+      try {
+        const res = await callApi('deleteLogs', {
+          pin: currentPin,
+          mode: 'SINGLE',
+          payload: { logRow, waktu, rollbackStock }
+        });
+        alert(`Berhasil menghapus ${res.deletedCount} riwayat.` + (rollbackStock ? ' Stok telah dikembalikan.' : ''));
+        await loadData();
+        await loadLogs();
+      } catch (err) {
+        alert('Gagal menghapus: ' + err.message);
+      }
+    }
+
+    async function executeBulkDelete() {
+      const mode = document.getElementById('delMode').value;
+      const jenis = document.getElementById('delJenis').value;
+      const rollbackStock = document.getElementById('delRollback').checked;
+      const payload = { jenis, rollbackStock };
+      let desc = '';
+
+      if (mode === 'BY_ITEM') {
+        const q = document.getElementById('delItemQuery').value.trim();
+        if (!q) return alert('Isi Nama Barang atau No. Katalog terlebih dahulu.');
+        payload.itemQuery = q;
+        desc = `semua riwayat barang "${q}"`;
+      } else if (mode === 'BY_DATE') {
+        const s = document.getElementById('delStartDate').value;
+        const e = document.getElementById('delEndDate').value || s;
+        if (!s) return alert('Pilih tanggal terlebih dahulu.');
+        payload.startDate = s;
+        payload.endDate = e;
+        desc = (s === e) ? `semua riwayat tanggal ${s}` : `semua riwayat tanggal ${s} s/d ${e}`;
+      } else if (mode === 'ALL') {
+        const ketik = prompt('PERINGATAN! Anda akan menghapus SEMUA riwayat mutasi & Kartu Stock.\nKetik "HAPUS" (huruf besar) untuk melanjutkan:');
+        if (ketik !== 'HAPUS') return alert('Penghapusan dibatalkan.');
+        desc = 'SEMUA riwayat mutasi';
+      }
+
+      if (mode !== 'ALL') {
+        const ok = confirm(
+          `Yakin ingin menghapus ${desc}?\n` +
+          `Kembalikan stok di Google Sheets: ${rollbackStock ? 'YA' : 'TIDAK'}\n\nTindakan ini tidak dapat dibatalkan.`
+        );
+        if (!ok) return;
+      }
+
+      const btn = document.getElementById('btnExecBulkDel');
+      btn.disabled = true;
+      btn.textContent = 'Menghapus...';
+
+      try {
+        const res = await callApi('deleteLogs', { pin: currentPin, mode, payload });
+        if (res.deletedCount === 0) {
+          alert('Tidak ada riwayat yang cocok dengan kriteria tersebut.');
+        } else {
+          alert(`Berhasil menghapus ${res.deletedCount} riwayat.` + (rollbackStock ? ` (${res.rolledBackCount} transaksi stok dikembalikan)` : ''));
+          document.getElementById('delItemQuery').value = '';
+          await loadData();
+          await loadLogs();
+        }
+      } catch (err) {
+        alert('Gagal menghapus: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🗑️ Eksekusi Hapus';
+      }
     }
 
     async function loadLogs() {
@@ -1114,7 +1250,9 @@
           return;
         }
 
-        el.innerHTML = logs.map(l => `
+        el.innerHTML = logs.map(l => {
+          const safeNama = escapeHtml(l.nama).replace(/'/g, "\\'");
+          return `
           <div class="p-3 rounded-xl border border-slate-200 flex justify-between items-center gap-2 flex-wrap">
             <div>
               <p class="font-bold text-slate-800">${escapeHtml(l.nama)}</p>
@@ -1125,15 +1263,20 @@
             </div>
             <div class="flex items-center gap-2 shrink-0">
               ${l.noBukti && l.noBukti !== '-' ? `
-                <button onclick="reprintBPB('${escapeHtml(l.noBukti)}')" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg">🖨️ Cetak BPB</button>
+                <button onclick="reprintBPB('${escapeHtml(l.noBukti)}')" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg">🖨️ BPB</button>
               ` : ''}
+              <button onclick="deleteSingleLog(${l.logRow}, '${escapeHtml(l.waktu)}', '${safeNama}', '${escapeHtml(l.jumlah)}')"
+                class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg" title="Hapus satuan">
+                🗑️
+              </button>
               <div class="text-right">
                 <span class="inline-block px-2 py-0.5 rounded text-xs font-bold ${l.jenis.includes('MASUK') ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${l.jenis} ${l.jumlah}</span>
                 <p class="text-xs text-slate-500 mt-0.5">Saldo: <strong>${l.saldoAkhir}</strong></p>
               </div>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       } catch (err) {
         el.innerHTML = '<p class="text-rose-500 text-center py-4">Gagal memuat riwayat: ' + escapeHtml(err.message) + '</p>';
       }
